@@ -428,3 +428,197 @@ details > summary {
   color: var(--bar-met);
   font-weight: 600;
 }
+
+.section-title {
+  max-width: 1100px;
+  margin: 24px auto 12px;
+  padding: 0 16px;
+  font-size: 1.05rem;
+}
+
+.notice {
+  margin: 0 0 12px;
+  background: var(--pending-bg);
+  color: var(--pending-ink);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.subhead {
+  font-size: 0.95rem;
+  margin: 14px 0 6px;
+}
+
+.check-block {
+  margin-bottom: 10px;
+}
+
+.check-block .hint {
+  margin: 2px 0 0;
+}
+
+.island-toggle {
+  display: grid;
+  gap: 2px;
+}
+
+.island-toggle .sub {
+  margin-left: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.chip.ok {
+  color: var(--bar-met);
+  border-color: var(--bar-met);
+}
+
+.confirm {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- premis demanats */
+
+.requests {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.request.done {
+  opacity: 0.8;
+}
+
+/* ---------------------------------------------------------------- monedes */
+
+.moves {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.moves li {
+  overflow-wrap: anywhere;
+}
+
+.amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount.up {
+  color: var(--bar-met);
+}
+
+.amount.down {
+  color: var(--warn-ink);
+}
+
+/* ---------------------------------------------------------------- missatge */
+
+textarea {
+  font: inherit;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  resize: vertical;
+}
+
+.msg-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.msg-list li {
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- expedicions */
+
+.island-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.island-row strong {
+  min-width: 90px;
+}
+
+.island-row .muted {
+  flex: 1 1 auto;
+}
+
+/* ---------------------------------------------------------------- premis reals (global) */
+
+.reward-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.reward-row {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reward-row-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.reward-row .cell-input {
+  min-height: 40px;
+  padding: 6px 8px;
+  flex: 1 1 140px;
+  min-width: 0;
+  width: auto;
+}
+
+.reward-row .cell-input.icon {
+  flex: 0 0 52px;
+  text-align: center;
+}
+
+.reward-row input[type='number'] {
+  flex: 0 0 84px;
+}
+
+.reward-row label.check {
+  flex: 0 0 auto;
+}
