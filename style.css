@@ -413,3 +413,18 @@ details > summary {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+.gifts {
+  margin: 0.5rem 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+}
+.gifts li {
+  padding: 0.2rem 0;
+  overflow-wrap: anywhere;
+}
+.gifts .ok {
+  color: var(--bar-met);
+  font-weight: 600;
+}

@@ -265,7 +265,8 @@ function childCard({ id, status, control, sha }) {
     daysChart(status.days, status.dailyGoalMinutes),
     h('div', { class: 'islands' }, ISLANDS.map((i) => islandBlock(status.islands[i], pace(i)))),
     errorsBlock(status),
-    controlForm(id, status, pending, sha),
+    giftForm(id, status, control, pending, sha),
+    controlForm(id, status, control, pending, sha),
   );
 }
 
@@ -300,7 +301,7 @@ function effective(status, pending) {
   };
 }
 
-function controlForm(id, status, pending, sha) {
+function controlForm(id, status, full, pending, sha) {
   const cur = effective(status, pending);
   const slotOptions = [['', '—'], ...SLOTS];
   const plan = [0, 1, 2, 3].map((i) => select(`slot${i}`, i < 1 ? SLOTS : slotOptions, cur.planTemplate[i] ?? '', `Casella ${i + 1}`));
@@ -364,6 +365,8 @@ function controlForm(id, status, pending, sha) {
       note.textContent = control.error;
       return;
     }
+    // Els regals es conserven sempre: cada PC cobra cada id una sola vegada.
+    if (full?.gifts) control.gifts = full.gifts;
     const button = form.querySelector('button[type=submit]');
     button.disabled = true;
     note.textContent = 'Desant…';
@@ -380,6 +383,62 @@ function controlForm(id, status, pending, sha) {
     }
   });
   return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form);
+}
+
+// ---------------------------------------------------------------- regals de monedes
+
+/** Llista de regals (el PC diu quins ha cobrat) i formulari per afegir-ne un. En desar, es conserva el control
+ *  pendent tal com està i s'hi afegeix el regal; els camps ja aplicats no es tornen a enviar. */
+function giftForm(id, status, full, pending, sha) {
+  const received = new Set(status.giftsReceived ?? []);
+  const gifts = full?.gifts ?? [];
+  const list = gifts.length
+    ? h(
+        'ul',
+        { class: 'gifts' },
+        gifts
+          .slice(-5)
+          .reverse()
+          .map((g) => h('li', {}, `🎁 ${g.coins} monedes${g.note ? ` · ${g.note}` : ''} — `, h('span', { class: received.has(g.id) ? 'ok' : 'muted' }, received.has(g.id) ? 'rebut' : 'pendent'))),
+      )
+    : null;
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const form = h(
+    'form',
+    { class: 'control' },
+    h('label', {}, 'Monedes', h('input', { type: 'number', name: 'coins', min: '1', max: '500', value: '20', required: true })),
+    h('label', {}, 'Motiu (opcional)', h('input', { type: 'text', name: 'note', maxlength: '80', placeholder: 'Per l’esforç d’aquesta setmana' })),
+    h('div', { class: 'row' }, h('button', { type: 'submit' }, 'Regala')),
+    note,
+  );
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const data = new FormData(form);
+    const coins = Math.round(Number(data.get('coins')));
+    if (!(coins >= 1 && coins <= 500)) {
+      note.textContent = 'Entre 1 i 500 monedes.';
+      return;
+    }
+    const text = String(data.get('note') ?? '').trim().slice(0, 80);
+    const gift = { id: `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, coins, ...(text ? { note: text } : {}) };
+    const { version: _v, updatedAt: _u, gifts: _g, ...rest } = pending ?? {};
+    const control = { version: 1, updatedAt: new Date().toISOString(), ...rest, gifts: [...gifts, gift] };
+    const button = form.querySelector('button[type=submit]');
+    button.disabled = true;
+    note.textContent = 'Desant…';
+    try {
+      await api(`control/${id}.json`, {
+        method: 'PUT',
+        body: JSON.stringify({ message: `panell: regal de ${coins} monedes`, content: encodeBase64(JSON.stringify(control, null, 2) + '\n'), ...(sha ? { sha } : {}) }),
+      });
+      note.textContent = 'Desat.';
+      await refresh();
+    } catch (err) {
+      note.textContent = explain(err);
+      button.disabled = false;
+    }
+  });
+  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Regala monedes'), list, form);
 }
 
 /**
