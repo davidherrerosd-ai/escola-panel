@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Escola · Panell</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>Escola <span class="muted">· panell de pares</span></h1>
+      <div class="top-actions">
+        <button type="button" id="reload" class="ghost" hidden>Actualitza</button>
+        <button type="button" id="settings" class="ghost" hidden>Connexió</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="login" class="card" hidden>
+        <h2>Connexió</h2>
+        <p class="muted">
+          Enganxa el token de GitHub amb accés al repositori de dades. Es desa només en aquest navegador.
+        </p>
+        <form id="login-form">
+          <label>Token<input id="token" type="password" autocomplete="off" spellcheck="false" required /></label>
+          <label>Repositori<input id="repo" type="text" autocomplete="off" spellcheck="false" required /></label>
+          <div class="row">
+            <button type="submit">Desa i entra</button>
+            <button type="button" id="forget" class="ghost">Oblida el token</button>
+          </div>
+        </form>
+      </section>
+
+      <p id="message" class="message" role="status" hidden></p>
+      <div id="children" class="children"></div>
+    </main>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>
