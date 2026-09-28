@@ -3,7 +3,7 @@
 // s'afegeix a `control/<id>.json` amb un id únic; el PC l'aplica un cop i ho marca a `actionsApplied`.
 
 import { explain, putControl } from './api.js';
-import { actionId, ago, confirmButton, h, shortDate } from './util.js';
+import { actionId, ago, confirmButton, dateWithMonth, h, shortDate } from './util.js';
 
 export const ISLANDS = ['mat', 'ca', 'es'];
 const PACES = [
@@ -28,6 +28,18 @@ const FOCUS_FIELDS = [
 const MILESTONE_PERCENTS = [25, 50, 75, 100];
 const REQUEST_STATUS_TEXT = { pendent: 'Pendent', entregat: 'Entregat', 'cancel·lat': 'Cancel·lat' };
 const EXPLORATION_TEXT = { pending: 'Expedició pendent', in_progress: 'Expedició a mitges', done: 'Illa explorada' };
+/** Temes que el PC sap entrenar (TOPIC_REGIONS del motor). Fix aquí: el panell no llegeix el contingut de l'app. */
+const TOPICS = [
+  ['es.acentos', 'Acentuación'],
+  ['es.bv', 'b/v'],
+  ['es.h', 'La h y sus homófonos'],
+  ['es.gj', 'g/j'],
+  ['es.lly', 'll/y'],
+  ['es.czx', 'c/z/qu/k y x/s'],
+  ['es.homofonos', 'Juntas o separadas'],
+  ['es.puntuacion', 'Puntuación y mayúsculas'],
+];
+const TOPIC_OUTCOME = { superado: 'superat', terminado: 'acabat', cambiado: 'canviat' };
 
 /** El PC encara no puja els camps nous (spec §1.3, build antic): avisem i no trenquem res. */
 function supportsRemote(status) {
@@ -141,6 +153,7 @@ export function childCard({ id, status, control, sha }, refresh) {
     remote ? coinsSection(id, status, control, sha, refresh) : null,
     remote ? messageSection(id, status, control, sha, refresh) : null,
     remote ? explorationsSection(id, status, control, sha, refresh) : null,
+    'topic' in status ? topicSection(id, status, control, sha, refresh) : null,
   );
 }
 
@@ -630,4 +643,121 @@ function explorationsSection(id, status, control, sha, refresh) {
     return h('div', { class: 'island-row' }, h('strong', {}, status.islands[island].name), h('span', { class: 'muted small' }, label), action);
   });
   return h('details', { class: 'control-wrap' }, h('summary', {}, 'Expedicions'), rows, note);
+}
+
+// ---------------------------------------------------------------- Entrenament d'una norma (spec 2026-09-28 §5.2)
+
+function pct(correct, total) {
+  return total > 0 ? Math.round((correct / total) * 100) : 0;
+}
+
+function topicTests(t) {
+  if (!t.tests.length) return h('p', { class: 'muted small' }, 'Encara no ha fet la prova inicial.');
+  return h(
+    'ol',
+    { class: 'topic-tests' },
+    t.tests.map((x) => h('li', {}, `${dateWithMonth(x.date)} · ${x.kind === 'initial' ? 'inicial' : 'periòdica'} · `, h('strong', {}, `${x.correct}/${x.total} (${pct(x.correct, x.total)} %)`))),
+  );
+}
+
+function topicRules(t) {
+  const last = t.tests[t.tests.length - 1];
+  if (!last) return null;
+  return h(
+    'ul',
+    { class: 'topic-rules' },
+    Object.entries(last.byRule).map(([rule, s]) => {
+      const p = pct(s.correct, s.total);
+      return h('li', { class: p >= 80 ? 'ok' : p < 50 ? 'bad' : '' }, h('span', {}, t.labels[rule] ?? rule), h('strong', {}, `${p} %`));
+    }),
+  );
+}
+
+function topicSection(id, status, control, sha, refresh) {
+  const t = status.topic;
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const queuedAssign = findPendingAction(control, status, (a) => a.type === 'topic');
+  const queuedStop = findPendingAction(control, status, (a) => a.type === 'topicStop');
+
+  const picker = h(
+    'select',
+    { name: 'topic', 'aria-label': 'Tema de l’entrenament' },
+    TOPICS.map(([value, label]) => h('option', { value, selected: (t?.topic ?? TOPICS[0][0]) === value }, label)),
+  );
+  // Canviar de tema amb un entrenament en curs arxiva la sessió actual com a «cambiado»: cal confirmar-ho
+  // igual que «Acaba l'entrenament» (mateix mecanisme de dos passos, sense diàleg natiu). Assignar quan no
+  // n'hi ha cap en curs continua sent d'un sol clic.
+  const assignWrap = h('span', { class: 'confirm' });
+  const doAssign = (topic, button) =>
+    runAction(id, status, control, sha, { id: actionId('topic'), type: 'topic', topic }, `panell: entrenament ${topic} per a ${id}`, note, refresh, button);
+  const showAssignIdle = () => {
+    const btn = h('button', { type: 'button' }, t ? 'Canvia al tema triat' : 'Comença');
+    btn.addEventListener('click', () => {
+      const topic = picker.value;
+      if (t && t.topic === topic) {
+        note.textContent = 'Ja està entrenant aquest tema.';
+        return;
+      }
+      if (t) showAssignConfirm(topic);
+      else void doAssign(topic, btn);
+    });
+    assignWrap.replaceChildren(btn);
+  };
+  const showAssignConfirm = (topic) => {
+    const confirmBtn = h('button', { type: 'button' }, 'Sí, canvia');
+    confirmBtn.addEventListener('click', () => void doAssign(topic, confirmBtn));
+    assignWrap.replaceChildren(
+      h('span', { class: 'muted small' }, 'Segur? L’entrenament actual es desarà com a canviat.'),
+      confirmBtn,
+      h('button', { type: 'button', class: 'ghost', onclick: showAssignIdle }, 'Cancel·la'),
+    );
+  };
+  showAssignIdle();
+  // si canvia el tema triat amb la confirmació oberta, torna al pas inicial (com el panell local)
+  picker.addEventListener('change', showAssignIdle);
+
+  const current = t
+    ? h(
+        'div',
+        { class: 'topic-current' },
+        h('p', {}, h('strong', {}, `En curs: ${t.title}`), h('span', { class: 'muted small' }, ` · des del ${dateWithMonth(t.assignedAt.slice(0, 10))} · sessions des de l’última prova: ${Math.min(t.sessionsSinceTest, 3)} de 3`)),
+        t.stalled ? h('p', { class: 'notice' }, 'Porta 4 proves sense millorar. Potser val la pena repassar-ho junts o canviar de tema.') : null,
+        t.redRules.length ? h('p', { class: 'notice' }, `Normes per sota del 50 %: ${t.redRules.map((r) => t.labels[r] ?? r).join(', ')}`) : null,
+        topicTests(t),
+        topicRules(t),
+        queuedStop
+          ? h('span', { class: 'chip' }, 'pendent d’acabar')
+          : confirmButton({
+              label: 'Acaba l’entrenament',
+              confirmLabel: 'Sí, acaba',
+              onConfirm: () => runAction(id, status, control, sha, { id: actionId('topic-stop'), type: 'topicStop' }, `panell: acaba l’entrenament de ${id}`, note, refresh),
+            }),
+      )
+    : h('p', { class: 'muted small' }, 'Ara no té cap entrenament.');
+
+  const queued = queuedAssign ? h('p', {}, h('span', { class: 'chip' }, 'pendent d’aplicar'), ` ${TOPICS.find(([v]) => v === queuedAssign.topic)?.[1] ?? queuedAssign.topic}`) : null;
+
+  const history = (status.topicHistory ?? []).slice().reverse();
+  const historyList = history.length
+    ? h(
+        'ul',
+        { class: 'msg-list' },
+        history.slice(0, 10).map((r) => {
+          const last = r.tests[r.tests.length - 1];
+          return h('li', {}, h('span', { class: r.outcome === 'superado' ? 'chip ok' : 'chip' }, TOPIC_OUTCOME[r.outcome] ?? r.outcome), ` ${r.title} · ${dateWithMonth(r.endedAt.slice(0, 10))}`, last ? ` · ${last.correct}/${last.total}` : '');
+        }),
+      )
+    : null;
+
+  return h(
+    'details',
+    { class: 'control-wrap' },
+    h('summary', {}, 'Entrenament'),
+    current,
+    queued,
+    h('div', { class: 'row' }, picker, queuedAssign ? null : assignWrap),
+    note,
+    historyList ? h('p', { class: 'muted small' }, 'Historial') : null,
+    historyList,
+  );
 }

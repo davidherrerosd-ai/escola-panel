@@ -622,3 +622,10 @@ textarea {
 .reward-row label.check {
   flex: 0 0 auto;
 }
+
+/* ---------------------------------------------------------------- entrenament */
+
+.topic-tests, .topic-rules { margin: 6px 0; padding-left: 20px; }
+.topic-rules li { display: flex; gap: 10px; justify-content: space-between; max-width: 360px; }
+.topic-rules li.ok strong { color: #1f7a45; }
+.topic-rules li.bad strong { color: #b3261e; }

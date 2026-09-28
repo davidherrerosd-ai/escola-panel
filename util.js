@@ -67,6 +67,12 @@ export function shortDate(date) {
   return d.toLocaleDateString('ca-ES', { weekday: 'short', day: 'numeric' });
 }
 
+/** `2026-09-28` → `28 de set.`, com al panell local (`shortDate` de `parents-ui.tsx`). */
+export function dateWithMonth(date) {
+  const d = new Date(`${date}T12:00:00`);
+  return d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
+}
+
 /** Id d'acció vàlid pel contracte del control remot: `/^[a-z0-9-]{4,64}$/`. */
 export function actionId(prefix) {
   const rand = Math.random().toString(36).slice(2, 8);
