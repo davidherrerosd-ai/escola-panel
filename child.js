@@ -154,6 +154,7 @@ export function childCard({ id, status, control, sha }, refresh) {
     remote ? messageSection(id, status, control, sha, refresh) : null,
     remote ? explorationsSection(id, status, control, sha, refresh) : null,
     'topic' in status ? topicSection(id, status, control, sha, refresh) : null,
+    'vela' in status ? velaSection(id, status, control, sha, refresh) : null,
   );
 }
 
@@ -760,4 +761,88 @@ function topicSection(id, status, control, sha, refresh) {
     historyList ? h('p', { class: 'muted small' }, 'Historial') : null,
     historyList,
   );
+}
+
+// ---------------------------------------------------------------- Illa de la Vela (spec 2026-09-29 §5)
+
+/** Nombre de preguntes de cada examen (`VELA_EXAM_SIZE` a `src/engine/vela.ts`). */
+const VELA_EXAM_SIZE = 12;
+/** Índex (0-based) del primer capítol de Feva: `velaChapterIndex('feva-parts')` a `src/engine/vela.ts`.
+ *  Obrir-lo exigeix tenir aprovat l'examen d'Optimist. */
+const VELA_FIRST_FEVA = 11;
+const VELA_BLOCK_LABELS = { optimist: 'Optimist', feva: 'Feva' };
+
+function velaExamLine(block, exams) {
+  const e = exams[block];
+  const label = VELA_BLOCK_LABELS[block];
+  if (!e.lastTry) return h('p', { class: 'muted small' }, `Examen ${label}: encara no fet.`);
+  const result = `${e.best}/${VELA_EXAM_SIZE}`;
+  const status = e.passedAt ? `aprovat el ${dateWithMonth(e.passedAt)}` : `no aprovat (últim intent ${dateWithMonth(e.lastTry)})`;
+  return h('p', {}, `Examen ${label}: `, h('strong', {}, result), ` · ${status}`);
+}
+
+/** Mateix motiu que el motor (`unlockNextChapter`) perquè el botó surti desactivat quan tocaria fallar. */
+function velaUnlockReason(v) {
+  if (v.unlocked >= v.total) return 'Ja ha obert tots els capítols.';
+  if (v.unlocked === VELA_FIRST_FEVA && !v.exams.optimist.passedAt) return "Cal aprovar l'examen d'Optimist abans d'obrir Feva.";
+  return null;
+}
+
+function velaUnlockRow(id, status, control, sha, v, note, refresh) {
+  const queued = findPendingAction(control, status, (a) => a.type === 'velaUnlock');
+  if (queued) return h('p', {}, h('span', { class: 'chip' }, 'pendent d’obrir'));
+  const reason = velaUnlockReason(v);
+  const btn = h(
+    'button',
+    {
+      type: 'button',
+      disabled: !!reason,
+      onclick: (ev) =>
+        runAction(id, status, control, sha, { id: actionId('vela-unlock'), type: 'velaUnlock' }, `panell: obre capítol de vela de ${id}`, note, refresh, ev.currentTarget),
+    },
+    'Obre el següent capítol',
+  );
+  return h('div', {}, h('div', { class: 'row' }, btn), reason ? h('p', { class: 'muted small' }, reason) : null);
+}
+
+function velaSection(id, status, control, sha, refresh) {
+  const v = status.vela;
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const queuedToggle = findPendingAction(control, status, (a) => a.type === 'vela');
+  const toggle = queuedToggle
+    ? h('span', { class: 'chip' }, `pendent: ${queuedToggle.enabled ? 'activa' : 'desactiva'}`)
+    : h(
+        'button',
+        {
+          type: 'button',
+          onclick: (ev) =>
+            runAction(
+              id,
+              status,
+              control,
+              sha,
+              { id: actionId('vela'), type: 'vela', enabled: !v.enabled },
+              `panell: vela ${!v.enabled ? 'activada' : 'desactivada'} per a ${id}`,
+              note,
+              refresh,
+              ev.currentTarget,
+            ),
+        },
+        v.enabled ? 'Desactiva' : 'Activa',
+      );
+
+  const progress = v.enabled
+    ? h(
+        'div',
+        {},
+        h('p', {}, `Capítols: ${v.unlocked} de ${v.total} oberts, ${v.done} completats`),
+        v.next ? h('p', {}, `Següent: ${v.next}`) : null,
+        velaExamLine('optimist', v.exams),
+        v.unlocked > VELA_FIRST_FEVA ? velaExamLine('feva', v.exams) : null,
+        v.titles.length ? h('p', {}, `Títols: ${v.titles.join(', ')}`) : null,
+        velaUnlockRow(id, status, control, sha, v, note, refresh),
+      )
+    : null;
+
+  return h('details', { class: 'control-wrap' }, h('summary', {}, '⛵ Illa de la Vela'), h('div', { class: 'row' }, toggle), progress, note);
 }

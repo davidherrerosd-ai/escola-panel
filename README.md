@@ -43,11 +43,14 @@ Configuración general (una sola tarjeta, vale para los dos hijos, `control/_glo
 - **Objectiu familiar**: días por semana y texto del premio.
 - **So**: efectos de sonido y voz.
 
-Las acciones (`coins`, `rewardStatus`, `message`, `relaunchExploration`, `topic` y `topicStop`) se encolan en
-`control/<id>.json` → `actions[]`, cada una con un id único; el PC las aplica una sola vez y las marca en
-`status.actionsApplied`. `topic` asigna el entrenamiento de una norma (spec
+Las acciones (`coins`, `rewardStatus`, `message`, `relaunchExploration`, `topic`, `topicStop`, `vela` y
+`velaUnlock`) se encolan en `control/<id>.json` → `actions[]`, cada una con un id único; el PC las aplica una
+sola vez y las marca en `status.actionsApplied`. `topic` asigna el entrenamiento de una norma (spec
 `docs/superpowers/specs/2026-09-28-refuerzo-tematico-design.md`) y `topicStop` lo acaba; la sección
-«Entrenament» solo aparece si el `status` del PC trae el campo `topic` (build 6 o posterior). El panel
+«Entrenament» solo aparece si el `status` del PC trae el campo `topic` (build 6 o posterior). `vela` activa o
+desactiva la Illa de la Vela (spec `docs/superpowers/specs/2026-09-29-illa-vela-design.md`) y `velaUnlock`
+abre el siguiente capítulo saltándose el límite de uno al día (pero no el examen de Optimist antes de abrir
+Feva); la sección «⛵ Illa de la Vela» solo aparece si el `status` trae el campo `vela`. El panel
 muestra «pendent» o «aplicat» según si el PC ya la ha recogido. Al desar
 **siempre** se conservan la cola `actions`, los `gifts` y los campos de ajustes que aún no ha aplicado el PC
 (aunque el guardado sea por otro motivo, como un simple regalo de monedas).
