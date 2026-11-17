@@ -749,7 +749,46 @@ function explorationsSection(id, status, control, sha, refresh) {
         });
     return h('div', { class: 'island-row' }, h('strong', {}, status.islands[island].name), h('span', { class: 'muted small' }, label), action);
   });
-  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Expedicions'), rows, note);
+  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Expedicions'), rows, note, openRegionBlock(id, status, control, sha, refresh));
+}
+
+/** L'app entén l'acció `openRegion` des de la build 13 (2026-11-18); una build anterior rebutjaria tot el fitxer. */
+const OPEN_REGION_BUILD = 13;
+
+/** «Obre ara una regió»: per quan l'expedició va donar per sabuda una base que no ho és (el Martí i les taules). */
+function openRegionBlock(id, status, control, sha, refresh) {
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const title = h('h3', {}, 'Obre ara una regió');
+  const help = h('p', { class: 'muted small' }, 'La regió s’obre com a prioritat, a dificultat 1, i el pla del dia la posa davant de les altres. El que ja ha fet a les altres regions es manté.');
+  if (!(status.build >= OPEN_REGION_BUILD)) {
+    return h('div', {}, title, h('p', { class: 'muted small' }, `Cal que l’ordinador de ${status.name} tingui la versió ${OPEN_REGION_BUILD} de l’app o posterior (ara té la ${status.build ?? '?'}). S’actualitza sola en obrir-la.`));
+  }
+  const applied = new Set(status.actionsApplied ?? []);
+  const queued = (control?.actions ?? []).filter((a) => a.type === 'openRegion' && !applied.has(a.id));
+  const queuedIds = new Set(queued.map((a) => a.region));
+  const regionTitle = (rid) => {
+    for (const i of ISLANDS) {
+      const r = status.islands[i].regions.find((x) => x.id === rid);
+      if (r) return `${r.emoji} ${r.title}`;
+    }
+    return rid;
+  };
+  const pendingList = queued.length
+    ? h('ul', { class: 'msg-list' }, queued.map((a) => h('li', {}, h('span', { class: 'chip' }, 'pendent'), ` ${regionTitle(a.region)}`)))
+    : null;
+  const groups = ISLANDS.map((i) => {
+    const locked = status.islands[i].regions.filter((r) => r.status === 'locked' && !queuedIds.has(r.id));
+    return locked.length ? h('optgroup', { label: status.islands[i].name }, locked.map((r) => h('option', { value: r.id }, `${r.emoji} ${r.title}`))) : null;
+  }).filter(Boolean);
+  if (!groups.length) return h('div', {}, title, pendingList, h('p', { class: 'muted small' }, 'No hi ha cap regió tancada.'));
+  const picker = h('select', { name: 'openRegion', 'aria-label': 'Regió per obrir' }, groups);
+  const button = confirmButton({
+    label: 'Obre-la ara',
+    confirmLabel: 'Sí, obre-la',
+    onConfirm: () =>
+      runAction(id, status, control, sha, { id: actionId('open'), type: 'openRegion', region: picker.value }, `panell: obre ${picker.value} per a ${id}`, note, refresh),
+  });
+  return h('div', {}, title, help, pendingList, h('div', { class: 'row' }, picker, button), note);
 }
 
 // ---------------------------------------------------------------- Entrenament d'una norma (spec 2026-09-28 §5.2)

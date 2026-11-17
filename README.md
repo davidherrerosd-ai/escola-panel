@@ -44,7 +44,9 @@ Por cada hijo, además del resumen de siempre (minutos, tesoro por isla, errores
   antiguos (`gifts`) se siguen mostrando en el historial junto con los movimientos nuevos.
 - **Missatge**: enviar un mensaje corto (1-280 caracteres) que verá en el Pla del dia; se indica si ya lo ha
   leído (`status.messages[].readAt`).
-- **Expedicions**: volver a explorar una isla (con confirmación), como el botón del panel de padres local.
+- **Expedicions**: volver a explorar una isla (con confirmación), como el botón del panel de padres local, y
+  **«Obre ara una regió»** (acción `openRegion`, desde build 13): abre una región cerrada como prioridad, a
+  dificultad 1 y la primera de la ruta, para cuando la exploración dio por sabida una base que no lo está.
 
 Configuración general (una sola tarjeta, vale para los dos hijos, `control/_global.json`):
 
@@ -53,7 +55,7 @@ Configuración general (una sola tarjeta, vale para los dos hijos, `control/_glo
 - **So**: efectos de sonido y voz.
 
 Las acciones (`coins`, `rewardStatus`, `message`, `relaunchExploration`, `topic`, `topicStop`, `vela` y
-`velaUnlock`) se encolan en `control/<id>.json` → `actions[]`, cada una con un id único; el PC las aplica una
+`velaUnlock` y `openRegion`) se encolan en `control/<id>.json` → `actions[]`, cada una con un id único; el PC las aplica una
 sola vez y las marca en `status.actionsApplied`. `topic` asigna el entrenamiento de una norma (spec
 `docs/superpowers/specs/2026-09-28-refuerzo-tematico-design.md`) y `topicStop` lo acaba; la sección
 «Entrenament» solo aparece si el `status` del PC trae el campo `topic` (build 6 o posterior). `vela` activa o
