@@ -1,9 +1,10 @@
-// Targeta d'un fill: resum (com ara) i totes les seccions d'edició remota (spec 2026-09-27 §3):
+// Fill: resum d'una pantalla i vistes de secció (spec 2026-11-17-panell-mobil) amb les seccions d'edició remota (spec 2026-09-27 §3):
 // Ajustos, Premis demanats, Monedes, Missatge i Expedicions. Cada acció en viu (`RemoteAction`, spec §1.1)
 // s'afegeix a `control/<id>.json` amb un id únic; el PC l'aplica un cop i ho marca a `actionsApplied`.
 
 import { explain, putControl } from './api.js';
 import { actionId, ago, confirmButton, dateWithMonth, h, shortDate } from './util.js';
+import { SECTIONS, accuracy, routeHash } from './view.js';
 
 export const ISLANDS = ['mat', 'ca', 'es'];
 const PACES = [
@@ -122,11 +123,48 @@ function effective(status, pending) {
   };
 }
 
-// ---------------------------------------------------------------- targeta sencera
+// ---------------------------------------------------------------- resum d'una pantalla i vistes de secció (spec 2026-11-17)
 
-export function childCard({ id, status, control, sha }, refresh) {
-  const pending = pendingControl(control, status);
+const SECTION_TITLES = {
+  ajusta: 'Ajusta',
+  errors: 'Errors',
+  premis: 'Premis demanats',
+  monedes: 'Monedes',
+  missatge: 'Missatge',
+  expedicions: 'Expedicions',
+  entrenament: 'Entrenament',
+  vela: '⛵ Illa de la Vela',
+};
+
+/** Seccions que té sentit oferir per a aquest `status` (mateixes condicions que abans de les pestanyes). */
+export function childAvailableSections(status) {
   const remote = supportsRemote(status);
+  return SECTIONS.filter((s) => {
+    if (['premis', 'monedes', 'missatge', 'expedicions'].includes(s)) return remote;
+    if (s === 'entrenament') return 'topic' in status;
+    if (s === 'vela') return 'vela' in status;
+    return true;
+  });
+}
+
+/** Una pista curta al botó de la secció, només quan surt de franc del `status`. */
+function sectionHint(section, status) {
+  if (section === 'premis') {
+    const n = (status.rewardRequests ?? []).filter((r) => r.status === 'pendent').length;
+    return n ? `${n} pendent${n > 1 ? 's' : ''}` : '';
+  }
+  if (section === 'monedes' && typeof status.coins === 'number') return `${status.coins} monedes`;
+  if (section === 'entrenament') return status.topic?.title ?? 'cap';
+  return '';
+}
+
+function pendingNotice(status, pending) {
+  return pending ? h('p', { class: 'pending' }, `Canvis desats ${ago(pending.updatedAt)}: s’aplicaran quan ${status.name} obri l’aplicació.`) : null;
+}
+
+export function childSummary({ id, status, control }) {
+  const pending = pendingControl(control, status);
+  const sections = childAvailableSections(status);
   return h(
     'article',
     { class: 'card child' },
@@ -136,45 +174,97 @@ export function childCard({ id, status, control, sha }, refresh) {
       h('h2', {}, status.name),
       h('span', { class: 'muted small' }, `actualitzat ${ago(status.generatedAt)}`, status.build ? ` · build ${status.build}` : ''),
     ),
-    pending ? h('p', { class: 'pending' }, `Canvis desats ${ago(pending.updatedAt)}: s’aplicaran quan ${status.name} obri l’aplicació.`) : null,
+    pendingNotice(status, pending),
     statsSection(status),
     daysChart(status.days, status.dailyGoalMinutes),
-    h('div', { class: 'islands' }, ISLANDS.map((i) => islandBlock(status.islands[i], (pending?.pace?.[i] ?? status.pace?.[i] ?? 'normal')))),
-    errorsBlock(status),
-    !remote
+    h('div', { class: 'islands' }, ISLANDS.map((i) => islandBlock(status.islands[i], pending?.pace?.[i] ?? status.pace?.[i] ?? 'normal'))),
+    topErrors(status),
+    !supportsRemote(status)
       ? h(
           'p',
           { class: 'notice' },
           `Actualitza l’app d’aquest ordinador per veure i editar la concentració, els premis per setmana, les fites, l’extensió i les accions en viu de ${status.name} (premis demanats, monedes, missatges i expedicions).`,
         )
       : null,
-    settingsSection(id, status, control, pending, sha, refresh),
-    remote ? rewardsSection(id, status, control, sha, refresh) : null,
-    remote ? coinsSection(id, status, control, sha, refresh) : null,
-    remote ? messageSection(id, status, control, sha, refresh) : null,
-    remote ? explorationsSection(id, status, control, sha, refresh) : null,
-    'topic' in status ? topicSection(id, status, control, sha, refresh) : null,
-    'vela' in status ? velaSection(id, status, control, sha, refresh) : null,
+    h(
+      'nav',
+      { class: 'section-nav', 'aria-label': `Seccions de ${status.name}` },
+      sections.map((s) => {
+        const hint = sectionHint(s, status);
+        return h(
+          'a',
+          { class: 'section-link', href: routeHash(id, s) },
+          h('span', { class: 'section-name' }, SECTION_TITLES[s]),
+          hint ? h('span', { class: 'muted small' }, hint) : null,
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'),
+        );
+      }),
+    ),
   );
 }
 
-// ---------------------------------------------------------------- resum (com abans)
+/** Una secció a pantalla sencera: capçalera per tornar i el contingut de sempre, obert. `null` si no hi és. */
+export function childSection({ id, status, control, sha }, section, refresh) {
+  if (!childAvailableSections(status).includes(section)) return null;
+  const pending = pendingControl(control, status);
+  const builders = {
+    ajusta: () => settingsSection(id, status, control, pending, sha, refresh),
+    errors: () => errorsPage(status),
+    premis: () => rewardsSection(id, status, control, sha, refresh),
+    monedes: () => coinsSection(id, status, control, sha, refresh),
+    missatge: () => messageSection(id, status, control, sha, refresh),
+    expedicions: () => explorationsSection(id, status, control, sha, refresh),
+    entrenament: () => topicSection(id, status, control, sha, refresh),
+    vela: () => velaSection(id, status, control, sha, refresh),
+  };
+  const body = builders[section]();
+  if (body.tagName === 'DETAILS') {
+    body.open = true;
+    body.classList.add('as-page');
+  }
+  return h(
+    'article',
+    { class: 'card child section-page' },
+    h('header', { class: 'section-head' }, h('a', { class: 'back', href: routeHash(id) }, `‹ ${status.name}`), h('h2', {}, SECTION_TITLES[section])),
+    pendingNotice(status, pending),
+    body,
+  );
+}
 
-function stat(label, value, hint) {
-  return h('div', { class: 'stat' }, h('span', { class: 'stat-label' }, label), h('strong', { class: 'stat-value' }, value), hint ? h('span', { class: 'stat-hint' }, hint) : null);
+/** `YYYY-MM-DD` del dia local, com `status.today` del PC. */
+function localDate(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function stat(label, value, hint, tone) {
+  return h(
+    'div',
+    { class: tone ? `stat tone-${tone}` : 'stat' },
+    h('span', { class: 'stat-label' }, label),
+    h('strong', { class: 'stat-value' }, value),
+    hint ? h('span', { class: 'stat-hint' }, hint) : null,
+  );
 }
 
 function statsSection(status) {
+  const goal = status.dailyGoalMinutes;
+  const today = status.days.find((d) => d.date === status.today) ?? { exercises: 0, correct: 0 };
+  const acc = accuracy(today.correct, today.exercises);
+  const perWeek = status.settings?.family?.daysPerWeek;
+  // Si el PC no ha pujat res avui, el «dia» del status és un altre: no l'anomenem «avui».
+  const isToday = status.today === localDate(new Date());
+  const dayLabel = isToday ? 'Avui' : dateWithMonth(status.today);
   return h(
     'div',
     { class: 'stats' },
-    stat('Avui', `${status.minutesToday} min`, `objectiu ${status.dailyGoalMinutes} min`),
-    stat('Setmana', `${status.minutesWeek} min`, `${status.activeDaysWeek} dies actius`),
-    stat('Nivells', `${status.levelsWeek}`, 'aquesta setmana'),
+    stat(dayLabel, `${status.minutesToday}/${goal} min`, status.minutesToday >= goal ? '✅ complert' : `falten ${goal - status.minutesToday} min`),
+    stat(isToday ? 'Encerts avui' : 'Encerts', acc.pct === null ? '—' : `${acc.pct} %`, today.exercises ? `${today.correct} de ${today.exercises}` : 'cap exercici', acc.tone),
+    stat('Setmana', `${status.activeDaysWeek}${perWeek ? `/${perWeek}` : ''} dies`, `${status.minutesWeek} min · ${status.levelsWeek} nivells`),
   );
 }
 
-/** Minuts dels últims 14 dies: una barra per dia, amb el valor al títol i una taula per a lectors de pantalla. */
+/** Últims 14 dies: barra de minuts i, a sota, el % d'encerts del dia (buit si no va jugar). */
 function daysChart(days, goal) {
   const max = Math.max(goal, ...days.map((d) => d.minutes), 1);
   const bars = days.map((d) =>
@@ -184,17 +274,29 @@ function daysChart(days, goal) {
       h('span', { class: d.minutes >= goal ? 'fill met' : 'fill', style: `height:${Math.round((d.minutes / max) * 100)}%` }),
     ),
   );
+  const pcts = days.map((d) => {
+    const acc = accuracy(d.correct, d.exercises);
+    return h('span', { class: `pct tone-${acc.tone}` }, acc.pct === null ? '' : `${acc.pct}`);
+  });
   const table = h(
     'table',
     { class: 'sr-only' },
-    h('caption', {}, 'Minuts per dia'),
-    h('tbody', {}, days.map((d) => h('tr', {}, h('th', { scope: 'row' }, shortDate(d.date)), h('td', {}, `${d.minutes} min`)))),
+    h('caption', {}, 'Minuts i encerts per dia'),
+    h(
+      'tbody',
+      {},
+      days.map((d) => {
+        const acc = accuracy(d.correct, d.exercises);
+        return h('tr', {}, h('th', { scope: 'row' }, shortDate(d.date)), h('td', {}, `${d.minutes} min`), h('td', {}, acc.pct === null ? '—' : `${acc.pct} % d’encerts`));
+      }),
+    ),
   );
   return h(
     'figure',
     { class: 'chart' },
     h('div', { class: 'bars', 'aria-hidden': 'true' }, h('span', { class: 'goal', style: `bottom:${Math.round((goal / max) * 100)}%` }), bars),
-    h('figcaption', { class: 'muted' }, `Minuts dels últims 14 dies (línia: objectiu de ${goal} min)`),
+    h('div', { class: 'pcts', 'aria-hidden': 'true' }, pcts),
+    h('figcaption', { class: 'muted' }, `Minuts (línia: objectiu de ${goal}) i % d’encerts, últims 14 dies`),
     table,
   );
 }
@@ -204,27 +306,31 @@ function islandBlock(island, pace) {
   return h(
     'div',
     { class: island.enabled ? 'island' : 'island off' },
-    h('div', { class: 'island-head' }, h('strong', {}, island.name), h('span', { class: 'chip' }, island.enabled ? `ritme: ${pace}` : 'desactivada')),
+    h('div', { class: 'island-head' }, h('strong', {}, island.name), h('span', { class: 'chip' }, island.enabled ? `${island.treasure} % · ${pace}` : 'desactivada')),
     h('div', { class: 'meter', role: 'img', 'aria-label': `Tresor ${island.treasure}%` }, h('span', { style: `width:${island.treasure}%` })),
-    h('div', { class: 'muted small' }, `Tresor ${island.treasure}%`, current ? ` · ara: ${current.emoji} ${current.title} (dificultat ${current.difficulty})` : ''),
+    current ? h('div', { class: 'muted small island-now' }, `ara: ${current.emoji} ${current.title} (dificultat ${current.difficulty})`) : null,
   );
 }
 
-function errorsBlock(status) {
-  const top = status.topRules.length
-    ? h('ol', { class: 'rules' }, status.topRules.map((r) => h('li', {}, h('span', {}, r.label), h('span', { class: 'count' }, `${r.count}`))))
-    : h('p', { class: 'muted' }, 'Cap error en els últims 30 dies.');
-  const last = h(
-    'details',
-    {},
-    h('summary', {}, `Últims ${status.recentErrors.length} errors`),
-    h(
-      'ul',
-      { class: 'errors' },
-      status.recentErrors.map((e) => h('li', {}, h('span', { class: 'muted small' }, `${shortDate(e.date)} · ${e.label}`), h('span', {}, e.prompt))),
-    ),
-  );
-  return h('div', {}, h('h3', {}, 'Errors més freqüents'), top, status.recentErrors.length ? last : null);
+function rulesList(rules) {
+  return h('ol', { class: 'rules' }, rules.map((r) => h('li', {}, h('span', {}, r.label), h('span', { class: 'count' }, `${r.count}`))));
+}
+
+function topErrors(status) {
+  if (!status.topRules.length) return h('p', { class: 'muted small' }, 'Cap error en els últims 30 dies.');
+  return h('div', {}, h('h3', {}, 'Errors més freqüents'), rulesList(status.topRules.slice(0, 3)));
+}
+
+function errorsPage(status) {
+  const top = status.topRules.length ? rulesList(status.topRules) : h('p', { class: 'muted' }, 'Cap error en els últims 30 dies.');
+  const last = status.recentErrors.length
+    ? h(
+        'ul',
+        { class: 'errors' },
+        status.recentErrors.map((e) => h('li', {}, h('span', { class: 'muted small' }, `${shortDate(e.date)} · ${e.label}`), h('span', {}, e.prompt))),
+      )
+    : null;
+  return h('div', {}, h('h3', {}, 'Errors més freqüents'), top, last ? h('h3', {}, `Últims ${status.recentErrors.length} errors`) : null, last);
 }
 
 // ---------------------------------------------------------------- Ajustos

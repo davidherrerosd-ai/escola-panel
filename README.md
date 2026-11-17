@@ -15,13 +15,22 @@ Repartido en módulos pequeños con ES modules nativos (import/export), sin bund
   automático según el sistema).
 - `util.js` — helpers compartidos: `h()` para crear elementos sin pasar nunca por `innerHTML` con datos del
   repositorio, `localStorage`, base64, formato de fechas y el botón de confirmación en dos pasos.
+- `view.js` — lógica pura de la vista (rutas del hash y % de aciertos), probada en `tests/panel/view.test.ts`.
 - `api.js` — capa de acceso a la API Contents de GitHub (o al servidor falso de `dev-sync-server.mjs`):
   sesión/token, `readJson`, y `putControl` (guarda con reintento automático si el `sha` ya no vale).
-- `child.js` — la tarjeta de cada hijo: resumen (como antes) y las secciones de edición remota.
+- `child.js` — cada hijo: el resumen de una pantalla (`childSummary`) y cada sección de edición remota en su vista (`childSection`).
 - `global.js` — la tarjeta de configuración general, común a los dos hijos (`control/_global.json`).
 - `app.js` — arranque: login, `refresh()` y montaje de las tarjetas.
 
 ## Qué hace
+
+**Pensado para el móvil (spec `docs/superpowers/specs/2026-11-17-panell-mobil-design.md`).** Pestañas fijas
+arriba: una por hijo y «⚙︎ General». La ruta va en el hash (`#marti`, `#marti/ajusta`, `#general`), así que el
+botón Atrás del móvil vuelve al resumen; sin hash se abre la última pestaña vista. El resumen de cada hijo
+cabe en una pantalla: hoy (minutos / objetivo), **aciertos de hoy** (verde ≥ 70 %, amarillo 50-69 %, rojo
+< 50 %), días de la semana frente al objetivo familiar, gráfica de 14 días con el % de aciertos debajo de cada
+día, una línea por isla, los 3 errores más frecuentes y botones a cada sección. Si el PC no ha subido nada hoy,
+la primera cifra lleva la fecha del último día en lugar de «Avui».
 
 Por cada hijo, además del resumen de siempre (minutos, tesoro por isla, errores):
 
