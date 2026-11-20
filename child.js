@@ -550,7 +550,43 @@ function settingsSection(id, status, full, pending, sha, refresh) {
       button.disabled = false;
     }
   });
-  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form, timeGoalBlock(id, status, full, sha, refresh));
+  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form, timeGoalBlock(id, status, full, sha, refresh), minAnswerBlock(id, status, full, sha, refresh));
+}
+
+/** L'app entén l'acció `minAnswer` des de la build 16 (2026-11-20). */
+const MIN_ANSWER_BUILD = 16;
+const MIN_ANSWER_OPTIONS = [0, 3, 5, 8, 10];
+
+/** «Temps mínim per pregunta»: el botó «Comprova» queda bloquejat uns segons a cada pregunta. */
+function minAnswerBlock(id, status, control, sha, refresh) {
+  const title = h('h3', {}, 'Temps mínim per pregunta');
+  const help = h('p', { class: 'muted small' }, 'El botó «Comprova» queda bloquejat aquests segons a cada pregunta i a cada intent. Per a qui respon a l’atzar.');
+  if (!(status.build >= MIN_ANSWER_BUILD)) {
+    return h('div', {}, title, help, h('p', { class: 'muted small' }, `Cal que l’ordinador de ${status.name} tingui la versió ${MIN_ANSWER_BUILD} de l’app o posterior (ara té la ${status.build ?? '?'}). S’actualitza sola en obrir-la.`));
+  }
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const cur = Number(status.minAnswerSeconds ?? 0);
+  const queued = findPendingAction(control, status, (a) => a.type === 'minAnswer');
+  const label = (s) => (s === 0 ? 'Sense mínim' : `${s} segons`);
+  const state = h('p', {}, `Ara: ${label(cur)}`);
+  if (queued) return h('div', {}, title, help, state, h('span', { class: 'chip' }, `pendent: ${label(queued.seconds)}`));
+  const picker = h('select', { name: 'minAnswer', 'aria-label': 'Temps mínim per pregunta' }, MIN_ANSWER_OPTIONS.map((s) => h('option', { value: String(s), selected: s === cur }, label(s))));
+  const save = h(
+    'button',
+    {
+      type: 'button',
+      onclick: (ev) => {
+        const seconds = Number(picker.value);
+        if (seconds === cur) {
+          note.textContent = 'No has canviat res.';
+          return;
+        }
+        runAction(id, status, control, sha, { id: actionId('min-answer'), type: 'minAnswer', seconds }, `panell: mínim de ${seconds} s per pregunta per a ${id}`, note, refresh, ev.currentTarget);
+      },
+    },
+    'Desa',
+  );
+  return h('div', {}, title, help, state, h('div', { class: 'row' }, picker, save), note);
 }
 
 /** L'app entén l'acció `timeGoal` des de la build 15 (2026-11-20); una build anterior rebutjaria tot el fitxer. */
