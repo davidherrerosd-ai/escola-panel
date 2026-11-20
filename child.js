@@ -550,7 +550,39 @@ function settingsSection(id, status, full, pending, sha, refresh) {
       button.disabled = false;
     }
   });
-  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form, timeGoalBlock(id, status, full, sha, refresh), minAnswerBlock(id, status, full, sha, refresh));
+  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form, resetDayBlock(id, status, full, sha, refresh), timeGoalBlock(id, status, full, sha, refresh), minAnswerBlock(id, status, full, sha, refresh));
+}
+
+/** L'app entén l'acció `resetDay` des de la build 17 (2026-11-20). */
+const RESET_DAY_BUILD = 17;
+
+/** Data d'avui a l'hora local del navegador (la de l'ordinador del nen, si som a casa). */
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** «Reinicia el dia d'avui»: per si ha respost a l'atzar; el pla torna a començar i els minuts tornen a comptar. */
+function resetDayBlock(id, status, control, sha, refresh) {
+  const title = h('h3', {}, 'Reinicia el dia d’avui');
+  const help = h(
+    'p',
+    { class: 'muted small' },
+    `Per si ha respost a l’atzar: el pla d’avui torna a començar i els ${status.dailyGoalMinutes} minuts de l’objectiu tornen a comptar des de zero (amb l’objectiu per temps). El que ha fet avui es queda al registre; el cofre ja obert no es torna a donar. Si l’app està oberta, s’aplica en uns 3 minuts.`,
+  );
+  if (!(status.build >= RESET_DAY_BUILD)) {
+    return h('div', {}, title, help, h('p', { class: 'muted small' }, `Cal que l’ordinador de ${status.name} tingui la versió ${RESET_DAY_BUILD} de l’app o posterior (ara té la ${status.build ?? '?'}). S’actualitza sola en obrir-la.`));
+  }
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const date = localToday();
+  const queued = findPendingAction(control, status, (a) => a.type === 'resetDay' && a.date === date);
+  if (queued) return h('div', {}, title, help, h('span', { class: 'chip' }, 'pendent: es reiniciarà quan l’app el rebi'));
+  const button = confirmButton({
+    label: 'Reinicia el dia',
+    confirmLabel: 'Sí, reinicia’l',
+    onConfirm: () => runAction(id, status, control, sha, { id: actionId('reset-day'), type: 'resetDay', date }, `panell: reinicia el dia ${date} de ${id}`, note, refresh),
+  });
+  return h('div', {}, title, help, h('div', { class: 'row' }, button), note);
 }
 
 /** L'app entén l'acció `minAnswer` des de la build 16 (2026-11-20). */
