@@ -550,7 +550,39 @@ function settingsSection(id, status, full, pending, sha, refresh) {
       button.disabled = false;
     }
   });
-  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form);
+  return h('details', { class: 'control-wrap' }, h('summary', {}, 'Ajusta'), form, timeGoalBlock(id, status, full, sha, refresh));
+}
+
+/** L'app entén l'acció `timeGoal` des de la build 15 (2026-11-20); una build anterior rebutjaria tot el fitxer. */
+const TIME_GOAL_BUILD = 15;
+
+/** «Objectiu per temps»: el dia es completa pels minuts, no per les caselles (el Martí responia de pressa per acabar). */
+function timeGoalBlock(id, status, control, sha, refresh) {
+  const title = h('h3', {}, 'Objectiu per temps');
+  const help = h(
+    'p',
+    { class: 'muted small' },
+    `El dia només es completa quan arriba als minuts de l’objectiu (ara ${status.dailyGoalMinutes}), no amb 3 nivells. Quan acaba les caselles del pla, n’hi apareixen més, d’una en una, fins arribar als minuts.`,
+  );
+  if (!(status.build >= TIME_GOAL_BUILD)) {
+    return h('div', {}, title, help, h('p', { class: 'muted small' }, `Cal que l’ordinador de ${status.name} tingui la versió ${TIME_GOAL_BUILD} de l’app o posterior (ara té la ${status.build ?? '?'}). S’actualitza sola en obrir-la.`));
+  }
+  const note = h('p', { class: 'muted small', role: 'status' });
+  const on = status.timeGoal === true;
+  const queued = findPendingAction(control, status, (a) => a.type === 'timeGoal');
+  const state = h('p', {}, on ? 'Ara: ✓ activat' : 'Ara: desactivat (el dia es completa amb el pla o amb 3 nivells)');
+  const toggle = queued
+    ? h('span', { class: 'chip' }, `pendent: ${queued.enabled ? 'activa' : 'desactiva'}`)
+    : h(
+        'button',
+        {
+          type: 'button',
+          onclick: (ev) =>
+            runAction(id, status, control, sha, { id: actionId('time-goal'), type: 'timeGoal', enabled: !on }, `panell: objectiu per temps ${!on ? 'activat' : 'desactivat'} per a ${id}`, note, refresh, ev.currentTarget),
+        },
+        on ? 'Desactiva' : 'Activa',
+      );
+  return h('div', {}, title, help, state, h('div', { class: 'row' }, toggle), note);
 }
 
 // ---------------------------------------------------------------- Premis demanats
